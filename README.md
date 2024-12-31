@@ -12,7 +12,8 @@ MOCAM is a web-based vintage camera application designed to provide users with t
 - **多种滤镜效果** | Various filter effects
 - **拍立得效果** | Polaroid-style photo output
 - **相册管理** | Album management
-- **响应式设计** | Responsive design
+- **响应式设计** | Respon![Uploading WX20241231-下午71207@2x.png…]()
+sive design
 
 ## 技术栈 | Tech Stack
 
