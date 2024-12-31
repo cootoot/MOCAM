@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MOCAM</title>
+    
+    <!-- iOS Web App 配置 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MOCAM">
+    
+    <!-- 添加启动屏样式 -->
+    <style>
+        /* 防止页面弹性滚动 */
+        html, body {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+        
+        /* 适配刘海屏 */
+        @supports (padding-top: env(safe-area-inset-top)) {
+            .camera-container {
+                padding-top: env(safe-area-inset-top);
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            
+            .controls {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            
+            .action-buttons {
+                bottom: calc(30px + env(safe-area-inset-bottom));
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #000;
+            color: #fff;
+        }
+
+        .camera-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viewfinder {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #camera-view {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform-origin: center center;
+            transition: transform 0.3s ease-out;
+        }
+
+        .controls {
+            height: 120px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            position: relative;
+            z-index: 10;
+        }
+
+        .camera-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .flip-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .shutter-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background-color: #fff;
+            border: none;
+            cursor: pointer;
+            position: relative;
+            z-index: 11;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .shutter-btn:active {
+            transform: scale(0.95);
+        }
+
+        .filter-btn {
+            padding: 8px 15px;
+            background: transparent;
+            color: white;
+            border: 1px solid white;
+            border-radius: 20px;
+            margin: 0 5px;
+        }
+
+        .camera-settings {
+            display: flex;
+            gap: 20px;
+        }
+
+        .setting-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: transparent;
+            border: 1px solid white;
+            color: white;
+            font-size: 20px;
+        }
+
+        /* 添加滤镜预设样式 */
+        .filter-nomo {
+            filter: contrast(1.1) saturate(1.1) sepia(0.2) brightness(0.95);
+        }
+
+        .filter-film {
+            filter: contrast(1.2) saturate(0.8) sepia(0.15) brightness(1.1) hue-rotate(5deg);
+        }
+
+        .filter-bw {
+            filter: grayscale(1) contrast(1.2) brightness(1.1);
+        }
+
+        .filter-vintage {
+            filter: sepia(0.4) contrast(1.1) brightness(0.9) saturate(0.8);
+        }
+
+        .filter-fade {
+            filter: brightness(1.1) contrast(0.9) saturate(0.8) sepia(0.1);
+        }
+
+        .filter-chrome {
+            filter: contrast(1.3) brightness(0.9) saturate(1.2) hue-rotate(-10deg);
+        }
+
+        .filter-warm {
+            filter: sepia(0.3) contrast(1.1) brightness(1.05) saturate(1.2) hue-rotate(10deg);
+        }
+
+        .filter-cool {
+            filter: sepia(0.2) contrast(1.1) brightness(1) saturate(0.9) hue-rotate(-10deg);
+        }
+
+        /* 添加激活状态的滤镜按钮样式 */
+        .filter-btn.active {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #fff;
+        }
+
+        /* 添加胶片颗粒效果 */
+        .grain-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyBAMAAADsEZWCAAAAGFBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVNDCqAAAACHRSTlMzMzMzMzMzM85JBgUAAAABYktHRAH/Ai3eAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4QMPByYnB2sQJQAAAFpJREFUOMtjYBgFgwwwKkhKSgoaSkhICBqKiooKGgoICAgaCggICAoyMDAIMTAwCDI0NDQwNDY2MjQ0NDYyNDQ0NDA0NDQwMDAwMDAwMDAwMDAyMjIyMqKxhwYAAIdkg7vR8h0AAAAASUVORK5CYII=');
+            opacity: 0.1;
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+
+        /* 添加拍立得预览样式 */
+        .polaroid-preview {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 12;
+            display: none;
+            cursor: pointer;
+        }
+
+        .polaroid-preview img {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 90vw;
+            max-height: 90vh;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            filter: brightness(0);
+            animation: develop 8s ease-out forwards;
+        }
+
+        .preview-hint {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out 8s forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes shake {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            25% { transform: translate(-50%, -50%) rotate(-2deg); }
+            75% { transform: translate(-50%, -50%) rotate(2deg); }
+            100% { transform: translate(-50%, -50%) rotate(0deg); }
+        }
+
+        @keyframes develop {
+            0% {
+                filter: brightness(0) contrast(1.2);
+            }
+            10% {
+                filter: brightness(0.1) contrast(1.2) sepia(0.4);
+            }
+            30% {
+                filter: brightness(0.3) contrast(1.2) sepia(0.3);
+            }
+            50% {
+                filter: brightness(0.5) contrast(1.2) sepia(0.2);
+            }
+            70% {
+                filter: brightness(0.7) contrast(1.1) sepia(0.1);
+            }
+            90% {
+                filter: brightness(0.9) contrast(1.05) sepia(0.05);
+            }
+            100% {
+                filter: brightness(1) contrast(1) sepia(0);
+            }
+        }
+
+        .filter-menu {
+            display: flex;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .filter-toggle {
+            width: 40px;
+            height: 40px;
+            padding: 0 15px;
+            min-width: 70px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .filter-panel {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            display: none;
+            width: 300px;
+            margin-bottom: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+            bottom: 120%;
+        }
+
+        .filter-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .filter-panel::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .filter-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .filter-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .filter-panel.show {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .filter-group {
+            margin-bottom: 15px;
+        }
+
+        .filter-group h3 {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            margin-bottom: 8px;
+            padding-left: 5px;
+        }
+
+        .filter-group .filter-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .filter-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        .filter-btn-container {
+            margin-bottom: 12px;
+        }
+
+        .filter-btn-container .filter-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 8px 12px;
+            margin: 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px 10px 0 0;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-desc {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            padding: 6px 12px;
+            margin: 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+        }
+
+        .filter-btn-container:hover .filter-btn {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .filter-btn-container .filter-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        .filter-btn-container .filter-btn.active + .filter-desc {
+            border-color: white;
+            color: white;
+        }
+
+        /* 调整面板宽度 */
+        .filter-panel {
+            width: 300px;
+        }
+
+        /* 添加新的徕卡滤镜样式 */
+        .filter-leica-mono {
+            filter: grayscale(1) contrast(1.3) brightness(0.95);
+        }
+
+        .filter-leica-chrome {
+            filter: contrast(1.2) saturate(0.9) brightness(0.95) sepia(0.1);
+        }
+
+        .filter-leica-vivid {
+            filter: contrast(1.25) saturate(1.1) brightness(0.9) hue-rotate(-5deg);
+        }
+
+        /* 添加新的滤镜样式 */
+        .filter-polaroid {
+            filter: contrast(1.2) saturate(1.1) brightness(1.05) sepia(0.2);
+        }
+
+        .lens-menu {
+            display: flex;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .lens-toggle {
+            width: 40px;
+            height: 40px;
+            padding: 0 15px;
+            min-width: 70px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .lens-panel {
+            position: absolute;
+            bottom: 100%;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            display: none;
+            width: 300px;
+            margin-bottom: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .lens-panel.show {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* 添加变焦相关样式 */
+        .viewfinder {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #camera-view {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform-origin: center center;
+            transition: transform 0.3s ease-out;
+        }
+
+        /* 添加焦距指示器 */
+        .focal-indicator {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            backdrop-filter: blur(5px);
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <div class="camera-container">
+        <div class="viewfinder">
+            <video id="camera-view" autoplay playsinline></video>
+            <div class="grain-overlay"></div>
+            <div class="focal-indicator">35mm</div>
+        </div>
+        <div class="controls">
+            <div class="camera-controls">
+                <div class="filter-menu">
+                    <button class="filter-toggle">胶卷</button>
+                    <div class="filter-panel">
+                        <div class="filter-group">
+                            <h3>拍立得胶片</h3>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn" data-type="polaroid">Polaroid SX-70</button>
+                                <p class="filter-desc">经典拍立得色彩，柔和明亮</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn" data-type="polaroid-square">Polaroid SX-70 Square</button>
+                                <p class="filter-desc">经典方形拍立得，8.8×8.8cm 画幅</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn" data-type="polaroid-rect">Polaroid 600 Film</button>
+                                <p class="filter-desc">长方形拍立得，8.8×10.7cm 画幅</p>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <h3>柯达系列</h3>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn" data-type="kodak">Portra 400</button>
+                                <p class="filter-desc">专业人像胶卷的标杆，完美的肤色和柔和的色调</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">Ektar 100</button>
+                                <p class="filter-desc">超饱和色彩，适合风景和静物，锐利的细节表现</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">Tri-X 400</button>
+                                <p class="filter-desc">经典黑白胶卷，优秀的反差和颗粒感</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">Gold 200</button>
+                                <p class="filter-desc">日常用胶首选，温暖讨喜的色调</p>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <h3>富士系列</h3>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn" data-type="fuji">Velvia 50</button>
+                                <p class="filter-desc">超高饱和度正片，适合风景，艳丽的色彩表现</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">Provia 100F</button>
+                                <p class="filter-desc">专业正片，自然的色彩平衡</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">Pro 400H</button>
+                                <p class="filter-desc">专业负片，柔和细腻的色调</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">CineStill 800T</button>
+                                <p class="filter-desc">电影胶片改造，钨丝灯光下蓝色调</p>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <h3>徕卡系列</h3>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn" data-type="leica">M Monochrom</button>
+                                <p class="filter-desc">纯粹的黑白影像，完美的层次表现，高端黑白徕卡的标志性效果</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">M10-P Chrome</button>
+                                <p class="filter-desc">经典徕卡色彩，自然的色调过渡，优雅的画面表现</p>
+                            </div>
+                            <div class="filter-btn-container">
+                                <button class="filter-btn">M10-R Vivid</button>
+                                <p class="filter-desc">现代徕卡色彩，鲜明的色彩表现，保持自然的同时突出主体</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button class="flip-btn">⟲</button>
+            </div>
+            <button class="shutter-btn"></button>
+            <div class="lens-menu">
+                <button class="lens-toggle">35mm</button>
+                <div class="lens-panel">
+                    <div class="filter-group">
+                        <h3>标准镜头</h3>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn active" data-focal="35">35mm</button>
+                            <p class="filter-desc">标准广角，适合街拍和日常</p>
+                        </div>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn" data-focal="50">50mm</button>
+                            <p class="filter-desc">标准人像焦距，自然视角</p>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>广角镜头</h3>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn" data-focal="24">24mm</button>
+                            <p class="filter-desc">广角视野，适合风景和建筑</p>
+                        </div>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn" data-focal="28">28mm</button>
+                            <p class="filter-desc">经典广角，适合环境人像</p>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>人像镜头</h3>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn" data-focal="75">75mm</button>
+                            <p class="filter-desc">中焦人像，适合半身像</p>
+                        </div>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn" data-focal="90">90mm</button>
+                            <p class="filter-desc">经典人像焦距，适合特写</p>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>长焦镜头</h3>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn" data-focal="135">135mm</button>
+                            <p class="filter-desc">经典长焦，压缩空间感</p>
+                        </div>
+                        <div class="filter-btn-container">
+                            <button class="filter-btn" data-focal="200">200mm</button>
+                            <p class="filter-desc">超长焦，强烈空间压缩</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="polaroid-preview" class="polaroid-preview"></div>
+
+    <div class="filter-tooltip"></div>
+
+    <script>
+        // 获取摄像头访问权限并显示预览
+        async function initCamera() {
+            try {
+                const videoElement = document.getElementById('camera-view');
+                
+                // 修改摄像头请求参数，增加兼容性
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        // 移除可能导致问题的高分辨率请求
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                };
+
+                // 先检查是否支持 getUserMedia
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('您的浏览器不支持访问摄像头，请使用最新版本的Chrome或Firefox浏览器');
+                }
+
+                // 请求摄像头权限
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // 获取视频轨道
+                const videoTrack = stream.getVideoTracks()[0];
+                
+                // 设置视频源
+                if ('srcObject' in videoElement) {
+                    videoElement.srcObject = stream;
+                } else {
+                    // 兼容旧版本
+                    videoElement.src = window.URL.createObjectURL(stream);
+                }
+
+                // 确保视频加载完成
+                await new Promise((resolve) => {
+                    videoElement.onloadedmetadata = () => {
+                        resolve();
+                    };
+                });
+
+                // 开始播放视频
+                await videoElement.play();
+
+                return true;
+            } catch (err) {
+                console.error('访问相机失败:', err);
+                // 显示更友好的错误信息
+                if (err.name === 'NotAllowedError') {
+                    alert('请允许访问摄像头权限以使用相机功能');
+                } else if (err.name === 'NotFoundError') {
+                    alert('未找到可用的摄像头设备');
+                } else {
+                    alert('无法访问摄像头：' + err.message);
+                }
+                return false;
+            }
+        }
+
+        // 添加滤镜控制功能
+        function initFilters() {
+            const filterToggle = document.querySelector('.filter-toggle');
+            const filterPanel = document.querySelector('.filter-panel');
+            const filterButtons = document.querySelectorAll('.filter-panel .filter-btn');
+            const videoElement = document.getElementById('camera-view');
+            
+            // 设置默认胶卷为 Portra 400
+            const defaultFilter = Array.from(filterButtons).find(btn => btn.textContent === 'Portra 400');
+            if (defaultFilter) {
+                defaultFilter.classList.add('active');
+                filterToggle.textContent = defaultFilter.textContent;
+                // 应用默认滤镜效果
+                videoElement.classList.add('filter-nomo');
+            }
+            
+            // 显示/隐藏滤镜面板
+            filterToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                filterPanel.classList.toggle('show');
+            });
+            
+            // 点击其他区域关闭面板
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.filter-menu')) {
+                    filterPanel.classList.remove('show');
+                }
+            });
+            
+            // 定义滤镜映射
+            const filters = {
+                'Polaroid SX-70 Square': 'filter-polaroid',
+                'Polaroid 600 Film': 'filter-polaroid',
+                'Polaroid SX-70': 'filter-polaroid',
+                'Portra 400': 'filter-nomo',
+                'Ektar 100': 'filter-chrome',
+                'Tri-X 400': 'filter-bw',
+                'Velvia 50': 'filter-vintage',
+                'Provia 100F': 'filter-fade',
+                'Gold 200': 'filter-warm',
+                'Pro 400H': 'filter-film',
+                'M Monochrom': 'filter-leica-mono',
+                'M10-P Chrome': 'filter-leica-chrome',
+                'M10-R Vivid': 'filter-leica-vivid'
+            };
+            
+            // 选择滤镜
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    // 移除所有滤镜按钮的激活状态
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    // 激活当前选中的滤镜按钮
+                    button.classList.add('active');
+                    
+                    // 移除所有滤镜类
+                    Object.values(filters).forEach(filter => {
+                        videoElement.classList.remove(filter);
+                    });
+                    
+                    // 添加选中的滤镜
+                    const filterName = button.textContent;
+                    if (filters[filterName]) {
+                        videoElement.classList.add(filters[filterName]);
+                    }
+                    
+                    // 更新当前滤镜显示
+                    filterToggle.textContent = button.textContent;
+                    
+                    // 关闭面板
+                    filterPanel.classList.remove('show');
+                });
+            });
+        }
+
+        // 修改 createPolaroid 函数
+        function createPolaroid(imageData) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 获取当前选中的胶卷名称和类型
+                    const activeFilter = document.querySelector('.filter-btn.active');
+                    const filmName = activeFilter ? activeFilter.textContent : 'MOCAM';
+                    const filmType = activeFilter ? activeFilter.dataset.type : 'default';
+                    
+                    // 获取胶卷所属公司
+                    const getFilmCompany = (filmName) => {
+                        if (filmName.includes('Portra') || filmName.includes('Ektar') || 
+                            filmName.includes('Gold') || filmName.includes('Tri-X')) {
+                            return 'kodak';
+                        } else if (filmName.includes('Velvia') || filmName.includes('Provia') || 
+                                 filmName.includes('Pro 400H')) {
+                            return 'fuji';
+                        } else if (filmName.includes('M') || filmName.includes('Leica')) {
+                            return 'leica';
+                        } else if (filmType && filmType.startsWith('polaroid')) {
+                            return 'polaroid';
+                        }
+                        return 'default';
+                    };
+
+                    const filmCompany = getFilmCompany(filmName);
+                    
+                    // 根据胶片类型调整图像比例
+                    let targetWidth = img.width;
+                    let targetHeight = img.height;
+                    
+                    if (filmCompany === 'polaroid') {
+                        if (filmType === 'polaroid-square') {
+                            // 方形画幅
+                            const size = Math.min(img.width, img.height);
+                            targetWidth = size;
+                            targetHeight = size;
+                        } else if (filmType === 'polaroid-rect') {
+                            // 长方形画幅 (4:5比例)
+                            if (img.width / img.height > 0.8) {
+                                targetHeight = img.height;
+                                targetWidth = img.height * 0.8;
+                            } else {
+                                targetWidth = img.width;
+                                targetHeight = img.width * 1.25;
+                            }
+                        }
+                    }
+                    
+                    // 计算裁切位置
+                    const cropX = (img.width - targetWidth) / 2;
+                    const cropY = (img.height - targetHeight) / 2;
+                    
+                    // 创建临时画布应用滤镜效果
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCanvas.width = targetWidth;
+                    tempCanvas.height = targetHeight;
+                    
+                    // 先将图像绘制到临时画布
+                    tempCtx.drawImage(img, cropX, cropY, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight);
+                    
+                    // 应用滤镜效果
+                    const imageData = tempCtx.getImageData(0, 0, targetWidth, targetHeight);
+                    switch (filmCompany) {
+                        case 'kodak':
+                            applyFilmFilter(imageData.data);
+                            break;
+                        case 'fuji':
+                            applyVintageFilter(imageData.data);
+                            break;
+                        case 'leica':
+                            applyLeicaMonoFilter(imageData.data);
+                            break;
+                        case 'polaroid':
+                            applyNomoFilter(imageData.data);
+                            break;
+                        default:
+                            applyChromeFilter(imageData.data);
+                            break;
+                    }
+                    tempCtx.putImageData(imageData, 0, 0);
+                    
+                    // 根据公司类型选择边框样式
+                    switch (filmCompany) {
+                        case 'kodak':
+                            createKodakStyle(ctx, tempCanvas, targetWidth, targetHeight, filmName);
+                            break;
+                        case 'fuji':
+                            createFujiStyle(ctx, tempCanvas, targetWidth, targetHeight, filmName);
+                            break;
+                        case 'leica':
+                            createLeicaStyle(ctx, tempCanvas, targetWidth, targetHeight, filmName);
+                            break;
+                        case 'polaroid':
+                            createPolaroidStyle(ctx, tempCanvas, targetWidth, targetHeight, filmName, 0, 0);
+                            break;
+                        default:
+                            createDefaultStyle(ctx, tempCanvas, targetWidth, targetHeight, filmName);
+                            break;
+                    }
+                    
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                };
+                img.src = imageData;
+            });
+        }
+
+        // 柯达风格边框
+        function createKodakStyle(ctx, img, width, height, filmName) {
+            const borderWidth = Math.round(height * 0.08); // 调整为适中的边框比例
+            const canvas = ctx.canvas;
+            
+            canvas.width = width + (borderWidth * 2);
+            canvas.height = height + (borderWidth * 2) + Math.round(height * 0.15); // 调整底部空间
+            
+            // 绘制黄色背景
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制照片
+            ctx.drawImage(img, borderWidth, borderWidth, width, height);
+            
+            // 绘制柯达 logo
+            ctx.save();
+            // 绘制红色背景块
+            ctx.fillStyle = '#FF0000';
+            const logoWidth = Math.round(width * 0.15);
+            const logoHeight = Math.round(borderWidth * 0.8);
+            ctx.fillRect(borderWidth * 0.5, borderWidth * 0.5, logoWidth, logoHeight);
+            
+            // 绘制白色文字
+            ctx.font = `bold ${Math.round(logoHeight * 0.7)}px -apple-system`;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.fillText('KODAK', borderWidth * 0.5 + logoWidth * 0.5, borderWidth * 0.5 + logoHeight * 0.7);
+            ctx.restore();
+            
+            // 添加日期和胶卷名称
+            const date = new Date().toLocaleDateString('zh-CN');
+            const videoElement = document.getElementById('camera-view');
+            const focalLength = parseInt(videoElement.dataset.focalLength) || 35;
+            ctx.font = `${Math.round(borderWidth * 0.5)}px -apple-system`;
+            ctx.fillStyle = '#000';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${filmName} · ${focalLength}mm · ${date}`, canvas.width - borderWidth * 0.7, canvas.height - borderWidth * 0.7);
+        }
+
+        // 徕卡风格边框
+        function createLeicaStyle(ctx, img, width, height, filmName) {
+            const borderWidth = Math.round(height * 0.07); // 调整为适中的边框比例
+            const canvas = ctx.canvas;
+            
+            canvas.width = width + (borderWidth * 2);
+            canvas.height = height + (borderWidth * 2) + Math.round(height * 0.12); // 调整底部空间
+            
+            // 绘制黑色背景
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制照片
+            ctx.drawImage(img, borderWidth, borderWidth, width, height);
+            
+            // 绘制徕卡 logo
+            ctx.save();
+            // 绘制红点
+            ctx.beginPath();
+            ctx.fillStyle = '#FF0000';
+            const dotRadius = Math.round(borderWidth * 0.3);
+            ctx.arc(borderWidth * 0.8, borderWidth * 0.8, dotRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 绘制品牌文字
+            ctx.font = `bold ${Math.round(borderWidth * 0.7)}px -apple-system`;
+            ctx.fillStyle = '#FF0000';
+            ctx.textAlign = 'left';
+            ctx.fillText('LEICA', borderWidth * 1.5, borderWidth * 0.9);
+            ctx.restore();
+            
+            // 添加日期和胶卷名称
+            const date = new Date().toLocaleDateString('zh-CN');
+            const videoElement = document.getElementById('camera-view');
+            const focalLength = parseInt(videoElement.dataset.focalLength) || 35;
+            ctx.font = `${Math.round(borderWidth * 0.5)}px -apple-system`;
+            ctx.fillStyle = '#FFF';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${filmName} · ${focalLength}mm · ${date}`, canvas.width - borderWidth * 0.6, canvas.height - borderWidth * 0.6);
+        }
+
+        // 富士风格边框
+        function createFujiStyle(ctx, img, width, height, filmName) {
+            const borderWidth = Math.round(height * 0.075); // 调整为适中的边框比例
+            const canvas = ctx.canvas;
+            
+            canvas.width = width + (borderWidth * 2);
+            canvas.height = height + (borderWidth * 2) + Math.round(height * 0.13); // 调整底部空间
+            
+            // 绘制渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#90EE90');
+            gradient.addColorStop(1, '#98FB98');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制照片
+            ctx.drawImage(img, borderWidth, borderWidth, width, height);
+            
+            // 绘制富士 logo
+            ctx.save();
+            // 绘制品牌文字
+            ctx.font = `bold ${Math.round(borderWidth * 0.8)}px -apple-system`;
+            ctx.fillStyle = '#006400';
+            ctx.textAlign = 'left';
+            ctx.fillText('FUJIFILM', borderWidth * 0.8, borderWidth * 1.2);
+            
+            // 绘制装饰线
+            ctx.strokeStyle = '#006400';
+            ctx.lineWidth = Math.round(borderWidth * 0.08);
+            ctx.beginPath();
+            ctx.moveTo(borderWidth * 0.8, borderWidth * 1.4);
+            ctx.lineTo(borderWidth * 3, borderWidth * 1.4);
+            ctx.stroke();
+            ctx.restore();
+            
+            // 添加日期和胶卷名称
+            const date = new Date().toLocaleDateString('zh-CN');
+            const videoElement = document.getElementById('camera-view');
+            const focalLength = parseInt(videoElement.dataset.focalLength) || 35;
+            ctx.font = `${Math.round(borderWidth * 0.6)}px -apple-system`;
+            ctx.fillStyle = '#006400';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${filmName} · ${focalLength}mm · ${date}`, canvas.width / 2, canvas.height - borderWidth * 0.8);
+        }
+
+        // 默认样式
+        function createDefaultStyle(ctx, img, width, height, filmName) {
+            const borderWidth = 15;
+            const canvas = ctx.canvas;
+            
+            canvas.width = width + (borderWidth * 2);
+            canvas.height = height + (borderWidth * 2) + 30;
+            
+            // 绘制白色背景
+            ctx.fillStyle = '#FFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制照片
+            ctx.drawImage(img, borderWidth, borderWidth, width, height);
+            
+            // 添加文字
+            const date = new Date().toLocaleDateString('zh-CN');
+            ctx.font = '14px -apple-system';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${filmName} · ${date}`, canvas.width - 10, canvas.height - 10);
+        }
+
+        // 修改 showPolaroidPreview 函数
+        function showPolaroidPreview(polaroidImage) {
+            const preview = document.getElementById('polaroid-preview');
+            preview.innerHTML = `
+                <img src="${polaroidImage}" style="cursor: pointer;">
+                <div class="preview-hint">点击照片保存 · 点击其他区域继续拍摄</div>
+            `;
+            preview.style.display = 'block';
+            preview.dataset.developing = 'true';
+
+            const img = preview.querySelector('img');
+            img.style.animation = 'shake 0.5s ease-out, develop 8s ease-out forwards';
+
+            return new Promise(resolve => {
+                img.addEventListener('animationend', (e) => {
+                    if (e.animationName === 'develop') {
+                        preview.dataset.developing = 'false';
+                        resolve();
+                    }
+                });
+            });
+        }
+
+        // 修改初始化函数
+        window.addEventListener('load', () => {
+            async function init() {
+                try {
+                    // 等待相机初始化完成
+                    const cameraReady = await initCamera();
+                    if (!cameraReady) {
+                        return; // 如果相机初始化失败，不继续执行
+                    }
+
+                    // 初始化其他功能
+                    initFilters();
+                    initCameraFlip();
+                    initLensSelector();
+                    
+                    // 获取必要的 DOM 元素
+                    const shutterBtn = document.querySelector('.shutter-btn');
+                    const videoElement = document.getElementById('camera-view');
+                    const preview = document.getElementById('polaroid-preview');
+                    let currentPolaroidImage = null;
+
+                    // 绑定拍照事件处理函数
+                    shutterBtn.addEventListener('click', async function handleCapture() {
+                        shutterBtn.disabled = true;
+                        try {
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d');
+                            
+                            // 获取当前变焦比例
+                            const focalLength = parseInt(videoElement.dataset.focalLength) || 35;
+                            const zoomRatio = focalLength / 35;
+                            
+                            // 设置较大的画布尺寸以保持图像质量
+                            const baseWidth = videoElement.videoWidth;
+                            const baseHeight = videoElement.videoHeight;
+                            canvas.width = baseWidth;
+                            canvas.height = baseHeight;
+                            
+                            // 先将完整视频帧绘制到画布上
+                            context.drawImage(videoElement, 0, 0, baseWidth, baseHeight);
+                            
+                            // 创建临时画布进行裁切
+                            const tempCanvas = document.createElement('canvas');
+                            const tempContext = tempCanvas.getContext('2d');
+                            
+                            // 计算裁切区域，保持原始宽高比
+                            const cropWidth = baseWidth / zoomRatio;
+                            const cropHeight = baseHeight / zoomRatio;
+                            const cropX = (baseWidth - cropWidth) / 2;
+                            const cropY = (baseHeight - cropHeight) / 2;
+                            
+                            // 设置临时画布尺寸为裁切后的大小
+                            tempCanvas.width = cropWidth;
+                            tempCanvas.height = cropHeight;
+                            
+                            // 将裁切区域复制到临时画布
+                            tempContext.drawImage(canvas,
+                                cropX, cropY, cropWidth, cropHeight,
+                                0, 0, cropWidth, cropHeight
+                            );
+                            
+                            // 创建拍立得效果
+                            const imageData = tempCanvas.toDataURL('image/jpeg', 0.9);
+                            const polaroidImage = await createPolaroid(imageData);
+                            currentPolaroidImage = polaroidImage;
+                            
+                            // 显示预览
+                            await showPolaroidPreview(polaroidImage);
+                        } catch (err) {
+                            console.error('保存照片时出错:', err);
+                            alert('保存照片失败');
+                        } finally {
+                            shutterBtn.disabled = false;
+                        }
+                    });
+                    
+                    // 预览点击事件
+                    preview.addEventListener('click', function handlePreview(e) {
+                        if (preview.dataset.developing === 'true') return;
+                        
+                        if (e.target.tagName === 'IMG') {
+                            if (currentPolaroidImage) {
+                                const link = document.createElement('a');
+                                link.download = `MOCAM_${new Date().getTime()}.jpg`;
+                                link.href = currentPolaroidImage;
+                                link.click();
+                            }
+                        } else {
+                            preview.style.display = 'none';
+                            currentPolaroidImage = null;
+                        }
+                    });
+
+                } catch (err) {
+                    console.error('初始化失败:', err);
+                    alert('相机初始化失败，请确保已授予相机权限并刷新页面重试');
+                }
+            }
+            init();
+        });
+
+        // 滤镜效果函数
+        function applyNomoFilter(pixels) {
+            for (let i = 0; i < pixels.length; i += 4) {
+                // 增加对比度和饱和度
+                pixels[i] = pixels[i] * 1.1;     // R
+                pixels[i + 1] = pixels[i + 1] * 1.1; // G
+                pixels[i + 2] = pixels[i + 2] * 1.1; // B
+
+                // 添加复古效果
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+
+                pixels[i] = Math.min(255, (r * 0.9 + g * 0.1 + b * 0.1));
+                pixels[i + 1] = Math.min(255, (r * 0.07 + g * 0.9 + b * 0.07));
+                pixels[i + 2] = Math.min(255, (r * 0.05 + g * 0.05 + b * 0.9));
+            }
+        }
+
+        function applyFilmFilter(pixels) {
+            for (let i = 0; i < pixels.length; i += 4) {
+                // 降低饱和度，增加对比度
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+
+                const avg = (r + g + b) / 3;
+                pixels[i] = Math.min(255, avg + (r - avg) * 0.8);
+                pixels[i + 1] = Math.min(255, avg + (g - avg) * 0.8);
+                pixels[i + 2] = Math.min(255, avg + (b - avg) * 0.8);
+
+                // 添加暖色调
+                pixels[i] = Math.min(255, pixels[i] * 1.1);
+                pixels[i + 1] = Math.min(255, pixels[i + 1] * 1.05);
+            }
+        }
+
+        function applyBWFilter(pixels) {
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+
+                // 转换为黑白并增加对比度
+                const bw = (r * 0.3 + g * 0.59 + b * 0.11);
+                const contrast = Math.min(255, (bw - 128) * 1.2 + 128);
+
+                pixels[i] = contrast;
+                pixels[i + 1] = contrast;
+                pixels[i + 2] = contrast;
+            }
+        }
+
+        function applyVintageFilter(pixels) {
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+
+                // 复古效果
+                pixels[i] = Math.min(255, (r * 0.9 + g * 0.2 + b * 0.1));
+                pixels[i + 1] = Math.min(255, (r * 0.2 + g * 0.8 + b * 0.1));
+                pixels[i + 2] = Math.min(255, (r * 0.1 + g * 0.1 + b * 0.9));
+            }
+        }
+
+        function applyChromeFilter(pixels) {
+            for (let i = 0; i < pixels.length; i += 4) {
+                // 增加对比度和饱和度
+                pixels[i] = Math.min(255, pixels[i] * 1.3);     // R
+                pixels[i + 1] = Math.min(255, pixels[i + 1] * 1.2); // G
+                pixels[i + 2] = Math.min(255, pixels[i + 2] * 1.1); // B
+            }
+        }
+
+        // 添加反转镜头功能
+        function initCameraFlip() {
+            const flipBtn = document.querySelector('.flip-btn');
+            let facingMode = 'environment';
+
+            flipBtn.addEventListener('click', async () => {
+                facingMode = facingMode === 'environment' ? 'user' : 'environment';
+                
+                try {
+                    const videoElement = document.getElementById('camera-view');
+                    const stream = videoElement.srcObject;
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+
+                    // 使用更保守的分辨率设置
+                    const constraints = {
+                        video: {
+                            facingMode: facingMode,
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        },
+                        audio: false
+                    };
+
+                    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    videoElement.srcObject = newStream;
+                    
+                    // 等待视频加载完成
+                    await new Promise((resolve) => {
+                        videoElement.onloadedmetadata = () => {
+                            resolve();
+                        };
+                    });
+
+                    await videoElement.play();
+                } catch (err) {
+                    console.error('切换摄像头失败:', err);
+                    alert('切换摄像头失败，请刷新页面重试');
+                }
+            });
+        }
+
+        // 添加徕卡滤镜处理函数
+        function applyLeicaMonoFilter(pixels) {
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+
+                // 高质量黑白转换
+                const mono = r * 0.2126 + g * 0.7152 + b * 0.0722;
+                // 增加对比度和层次
+                const contrast = Math.min(255, (mono - 128) * 1.3 + 128);
+
+                pixels[i] = contrast;
+                pixels[i + 1] = contrast;
+                pixels[i + 2] = contrast;
+            }
+        }
+
+        // 添加 createPolaroidStyle 函数
+        function createPolaroidStyle(ctx, img, width, height, filmName, cropX, cropY) {
+            // 调整为真实拍立得的比例
+            const borderTop = Math.round(height * 0.08);    // 减小顶部边框
+            const borderSide = Math.round(width * 0.08);    // 减小侧边边框
+            const borderBottom = Math.round(height * 0.15); // 减小底部边框
+            const canvas = ctx.canvas;
+            
+            // 设置画布尺寸
+            canvas.width = width + (borderSide * 2);
+            canvas.height = height + borderTop + borderBottom;
+            
+            // 绘制白色背景
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制 Polaroid logo
+            ctx.save();
+            const logoSize = Math.round(borderTop * 0.4);
+            ctx.font = `bold ${logoSize}px -apple-system`;
+            ctx.fillStyle = '#999';
+            ctx.textAlign = 'left';
+            ctx.fillText('POLAROID', borderSide * 0.5, borderTop * 0.4);
+            
+            // 添加彩虹装饰条
+            const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#8b00ff'];
+            const stripeWidth = Math.round(borderSide * 0.15);
+            const stripeHeight = Math.round(borderTop * 0.25);
+            colors.forEach((color, i) => {
+                ctx.fillStyle = color;
+                ctx.fillRect(
+                    borderSide + (i * stripeWidth), 
+                    borderTop * 0.6,
+                    stripeWidth, 
+                    stripeHeight
+                );
+            });
+            ctx.restore();
+            
+            // 添加阴影效果
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 5;
+            
+            // 绘制照片
+            ctx.drawImage(img, cropX, cropY, width, height, borderSide, borderTop, width, height);
+            
+            // 重置阴影
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            
+            // 添加日期和胶卷名称
+            const date = new Date().toLocaleDateString('zh-CN');
+            ctx.textAlign = 'center';
+            const titleSize = Math.round(borderBottom * 0.35); // 调整标题大小
+            ctx.font = `bold ${titleSize}px -apple-system`;
+            ctx.fillStyle = '#333';
+            ctx.fillText(filmName, canvas.width / 2, height + borderTop + (borderBottom * 0.5));
+            
+            const dateSize = Math.round(borderBottom * 0.2); // 调整日期大小
+            ctx.font = `${dateSize}px -apple-system`;
+            ctx.fillStyle = '#666';
+            ctx.fillText(date, canvas.width / 2, height + borderTop + (borderBottom * 0.8));
+        }
+
+        function initLensSelector() {
+            const lensToggle = document.querySelector('.lens-toggle');
+            const lensPanel = document.querySelector('.lens-panel');
+            const lensButtons = document.querySelectorAll('.lens-panel .filter-btn');
+            const videoElement = document.getElementById('camera-view');
+            const focalIndicator = document.querySelector('.focal-indicator');
+            
+            // 基准焦距（35mm相当于1倍变焦）
+            const BASE_FOCAL = 35;
+            let currentZoom = 1;
+            
+            // 显示/隐藏镜头面板
+            lensToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                lensPanel.classList.toggle('show');
+            });
+            
+            // 点击其他区域关闭面板
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.lens-menu')) {
+                    lensPanel.classList.remove('show');
+                }
+            });
+            
+            // 应用变焦效果
+            function applyZoom(focalLength) {
+                const zoomRatio = focalLength / BASE_FOCAL;
+                currentZoom = Math.max(1, zoomRatio);
+                
+                // 应用变焦效果
+                videoElement.style.transform = `scale(${currentZoom})`;
+                
+                // 更新焦距指示器
+                focalIndicator.textContent = `${focalLength}mm`;
+                
+                // 存储当前焦距，用于拍照时的裁切
+                videoElement.dataset.focalLength = focalLength;
+            }
+            
+            // 选择镜头
+            lensButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    lensButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // 获取焦距并应用变焦
+                    const focalLength = parseInt(button.dataset.focal);
+                    applyZoom(focalLength);
+                    
+                    // 更新当前镜头显示
+                    lensToggle.textContent = `${focalLength}mm`;
+                    
+                    // 关闭面板
+                    lensPanel.classList.remove('show');
+                });
+            });
+            
+            // 初始化默认焦距
+            applyZoom(BASE_FOCAL);
+        }
+    </script>
+</body>
+</html> 
