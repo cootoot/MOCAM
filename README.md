@@ -49,12 +49,32 @@ This project is licensed under the MIT License, allowing you to use, modify, and
 如有任何问题或建议，请通过 GitHub 联系我们。您也可以在项目页面上提交问题，我们会尽快回复。
 
 If you have any questions or suggestions, please contact us via GitHub. You can also submit issues on the project page, and we will respond as soon as possible.
+## 版本更新说明 | Version Release Notes
+
+### v1.0 - 初始版本 | Initial Release
+- **功能**: 提供基本的相机拍摄功能，支持实时预览和简单的照片保存。
+- **界面**: 采用简洁的用户界面，适配移动设备。
+- **滤镜**: 包含基础的滤镜效果，用户可以在拍摄时选择。
+
+### v2.0 - 功能增强 | Feature Enhancement
+- **相机信息显示**: 添加了相机状态信息显示，包括胶卷类型和 ISO 设置。
+- **焦距指示器**: 引入焦距指示器，用户可以实时查看当前焦距。
+- **对焦框**: 增加了对焦框功能，用户可以通过点击取景器来选择对焦位置。
+- **滤镜效果更新**: 增加了多种新的滤镜效果，提升了照片的艺术感。
+- **用户体验改进**: 优化了用户界面，增强了交互体验。
+
+### v3.0 - 进一步优化 | Further Optimization
+- **拍立得效果**: 改进了拍立得效果的生成，增加了更多的自定义选项。
+- **滤镜管理**: 增强了滤镜管理功能，用户可以更方便地选择和应用滤镜。
+- **性能优化**: 对代码进行了优化，提高了应用的性能和响应速度。
+- **错误修复**: 修复了已知的错误和问题，提升了应用的稳定性。
+- **文档更新**: 更新了项目文档，提供了更详细的使用说明和贡献指南。
 
 ## 未来计划 | Future Plans
+- **移动应用版本**: 考虑开发移动应用版本，以便用户在手机上更方便地使用。
+- **更多滤镜效果**: 计划引入更多胶卷风格的滤镜，以丰富用户的选择。
+- **用户反馈**: 欢迎用户提供反馈和建议，以帮助我们不断改进和完善项目。
 
-- **增加更多滤镜效果** | Add more filter effects: 计划引入更多胶卷风格的滤镜，以丰富用户的选择。
-- **改进用户界面** | Improve user interface: 计划优化界面设计，使其更加直观和易用。
-- **移动应用版本** | Mobile app version: 考虑开发移动应用版本，以便用户在手机上更方便地使用。
 
 ## 反馈 | Feedback
 
