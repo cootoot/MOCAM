@@ -26,9 +26,9 @@ MOCAM is a web-based vintage camera application designed to provide users with t
 
 1. 克隆项目到本地 | Clone the project to your local machine:
    ```bash
-   git clone https://github.com/yourusername/mocam.git
+   git clone https://github.com/cootoot/MOCAM.git
    ```
-2. 在浏览器中打开 `index.html` 文件 | Open the `index.html` file in your browser.
+2. 在浏览器中打开 `mocam.html` 文件 | Open the `mocam.html` file in your browser.
 3. 允许浏览器访问摄像头 | Allow the browser to access the camera.
 4. 开始拍摄和编辑照片 | Start capturing and editing photos!
 
